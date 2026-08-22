@@ -1,93 +1,48 @@
 // Helpers de Google para LA NUTRIA APP.
-// Auth con service account (JWT RS256 firmado aquí), carpetas y archivos en
-// Drive, y sincronización del Sheet aprovechando la conversión CSV de Drive.
+//
+// Actuamos en nombre del usuario con un refresh_token (OAuth), no con una
+// service account: Google no permite que una service account escriba archivos
+// en "Mi unidad" porque no tiene cuota propia.
+//
+// El scope es drive.file, que solo da acceso a lo que la app crea. Nunca ve el
+// resto del Drive.
 //
 // Este archivo se copia dentro de cada función que lo necesita: Supabase
 // despliega cada función como una unidad independiente.
 
-export interface SA {
-  client_email: string;
-  private_key: string;
-  token_uri?: string;
-}
-
-/** Lee GOOGLE_SA_KEY y tolera las formas en que se suele pegar mal. */
-export function getSA(): SA {
-  const raw = Deno.env.get('GOOGLE_SA_KEY');
-  if (!raw) throw new Error('Falta el secreto GOOGLE_SA_KEY.');
-  let sa: SA;
-  try {
-    sa = JSON.parse(raw);
-  } catch {
-    throw new Error('GOOGLE_SA_KEY no es JSON válido. Pega el archivo completo, de la { a la }.');
+/** Cambia el refresh_token guardado por un access_token fresco. */
+export async function getAccessToken(supa: any): Promise<string> {
+  const { data } = await supa
+    .from('configuracion').select('google_refresh_token').eq('id', 1).single();
+  const refresh = data?.google_refresh_token;
+  if (!refresh) {
+    throw new Error('Google no está conectado. Abre una vez la URL de setup de google-oauth.');
   }
-  if (!sa.client_email || !sa.private_key) {
-    throw new Error('GOOGLE_SA_KEY no tiene client_email o private_key.');
+  const clientId = Deno.env.get('GOOGLE_OAUTH_CLIENT_ID');
+  const clientSecret = Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET');
+  if (!clientId || !clientSecret) {
+    throw new Error('Faltan GOOGLE_OAUTH_CLIENT_ID o GOOGLE_OAUTH_CLIENT_SECRET.');
   }
-  // Si el JSON se pegó con los \n doblemente escapados, la clave llega literal.
-  if (sa.private_key.includes('\\n')) {
-    sa.private_key = sa.private_key.replace(/\\n/g, '\n');
-  }
-  return sa;
-}
-
-function pemToBuf(pem: string): ArrayBuffer {
-  const b64 = pem
-    .replace(/-----BEGIN PRIVATE KEY-----/, '')
-    .replace(/-----END PRIVATE KEY-----/, '')
-    .replace(/\s/g, '');
-  const bin = atob(b64);
-  const buf = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
-  return buf.buffer;
-}
-
-function b64url(data: ArrayBuffer | Uint8Array | string): string {
-  let bytes: Uint8Array;
-  if (typeof data === 'string') bytes = new TextEncoder().encode(data);
-  else bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
-  let bin = '';
-  for (const b of bytes) bin += String.fromCharCode(b);
-  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-/** Firma un JWT RS256 con la private key y lo cambia por un access_token. */
-export async function getAccessToken(sa: SA): Promise<string> {
-  const now = Math.floor(Date.now() / 1000);
-  const aud = sa.token_uri || 'https://oauth2.googleapis.com/token';
-  const header = { alg: 'RS256', typ: 'JWT' };
-  const claim = {
-    iss: sa.client_email,
-    scope: 'https://www.googleapis.com/auth/drive',
-    aud,
-    exp: now + 3600,
-    iat: now,
-  };
-  const unsigned = `${b64url(JSON.stringify(header))}.${b64url(JSON.stringify(claim))}`;
-  const key = await crypto.subtle.importKey(
-    'pkcs8',
-    pemToBuf(sa.private_key),
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  );
-  const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(unsigned));
-  const res = await fetch(aud, {
+  const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion: `${unsigned}.${b64url(sig)}`,
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refresh,
+      grant_type: 'refresh_token',
     }),
   });
   const j = await res.json();
-  if (!j.access_token) throw new Error('Auth con Google falló: ' + JSON.stringify(j));
+  if (!j.access_token) {
+    throw new Error('No se pudo refrescar el token de Google: ' + JSON.stringify(j));
+  }
   return j.access_token as string;
 }
 
 export const H = (token: string) => ({ Authorization: `Bearer ${token}` });
 
-const DRIVE_ARGS = 'supportsAllDrives=true&includeItemsFromAllDrives=true&corpora=allDrives';
+const DRIVE_ARGS = 'supportsAllDrives=true&includeItemsFromAllDrives=true';
 
 async function findFolder(token: string, name: string, parent: string): Promise<string | null> {
   const q = `'${parent}' in parents and name='${name.replace(/'/g, "\\'")}' ` +
@@ -114,6 +69,19 @@ async function createFolder(token: string, name: string, parent: string): Promis
 /** Devuelve el ID de la carpeta, creándola si no existe. */
 export async function ensureFolder(token: string, name: string, parent: string): Promise<string> {
   return (await findFolder(token, name, parent)) || (await createFolder(token, name, parent));
+}
+
+/**
+ * Carpeta raíz de la app. Con scope drive.file no podemos ver carpetas creadas
+ * a mano, así que la app crea la suya y guarda el ID.
+ */
+export async function ensureRoot(token: string, supa: any): Promise<string> {
+  const { data } = await supa
+    .from('configuracion').select('drive_root_folder_id').eq('id', 1).single();
+  if (data?.drive_root_folder_id) return data.drive_root_folder_id;
+  const id = await ensureFolder(token, 'LA NUTRIA APP', 'root');
+  await supa.from('configuracion').update({ drive_root_folder_id: id }).eq('id', 1);
+  return id;
 }
 
 export async function uploadFile(

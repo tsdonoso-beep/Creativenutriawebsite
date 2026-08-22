@@ -6,7 +6,7 @@ PWA para registrar los gastos de casa. Offline-first, sin framework ni build ste
 
 - **Frontend:** HTML/CSS/JS vanilla, instalable (manifest + Service Worker), cola offline en IndexedDB.
 - **Backend:** Supabase — Postgres + Edge Functions (Deno/TypeScript).
-- **Boletas:** Google Drive vía service account (JWT RS256 firmado dentro de la Edge Function).
+- **Boletas:** Google Drive con OAuth de usuario (scope `drive.file`, refresh token en la base).
 
 ## Base de datos
 
@@ -34,6 +34,30 @@ proyecto `la-nutria-app`.
 
 Secretos que viven en Supabase (Settings → Edge Functions → Secrets), nunca en el cliente:
 
-- `GOOGLE_SA_KEY` — el JSON completo de la service account de Google.
+- `GOOGLE_OAUTH_CLIENT_ID`
+- `GOOGLE_OAUTH_CLIENT_SECRET`
 
-La carpeta raíz de Drive se guarda en `configuracion.drive_parent_id`.
+El `refresh_token` se guarda en `configuracion.google_refresh_token` al abrir una
+sola vez la función `google-oauth`; esa tabla no tiene políticas de RLS, así que
+solo la ve el service role.
+
+### Por qué OAuth y no una service account
+
+Google no permite que una service account escriba archivos en "Mi unidad": no
+tiene cuota propia y el archivo quedaría a su nombre (`storageQuotaExceeded`).
+Funciona solo contra Unidades compartidas, que requieren Workspace. Con OAuth de
+usuario los archivos son del dueño de la cuenta y usan su espacio.
+
+El scope es `drive.file`, que da acceso únicamente a lo que la app crea — nunca
+al resto del Drive. Por eso la app crea su propia carpeta `LA NUTRIA APP` en vez
+de usar una compartida a mano.
+
+## Edge Functions
+
+| función | qué hace |
+|---|---|
+| `gasto-guardar` | registra el gasto (idempotente por `client_uuid`) y deja la foto en Storage |
+| `gasto-a-drive` | sube la boleta a la carpeta del mes y refresca el Sheet |
+| `sheet-sync` | vuelca todos los gastos al Google Sheet |
+| `drive-reintentos` | reintenta las boletas que quedaron pendientes o en error |
+| `google-oauth` | conecta la cuenta de Google una sola vez |

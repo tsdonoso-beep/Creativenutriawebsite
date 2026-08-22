@@ -1,6 +1,6 @@
 // gasto-a-drive · sube la boleta de un gasto a Drive y refresca el Sheet.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { ensureFolder, getAccessToken, getSA, sani, syncSheet, uploadFile } from './google.ts';
+import { ensureFolder, ensureRoot, getAccessToken, sani, syncSheet, uploadFile } from './google.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -36,16 +36,11 @@ Deno.serve(async (req) => {
     if (!g.imagen_path) return json({ error: 'El gasto no tiene foto.' }, 400);
     if (g.drive_file_id) return json({ ok: true, drive_url: g.drive_url, ya_estaba: true });
 
-    const { data: cfg } = await supa
-      .from('configuracion').select('drive_parent_id').eq('id', 1).single();
-    if (!cfg?.drive_parent_id) {
-      return json({ error: 'Falta configurar drive_parent_id en la tabla configuracion.' }, 400);
-    }
+    const token = await getAccessToken(supa);
 
-    const token = await getAccessToken(getSA());
-
-    // Carpeta del mes dentro de la carpeta raíz compartida
-    const carpetaMes = await ensureFolder(token, g.periodo, cfg.drive_parent_id);
+    // Carpeta del mes dentro de la carpeta raíz que crea la propia app
+    const raiz = await ensureRoot(token, supa);
+    const carpetaMes = await ensureFolder(token, g.periodo, raiz);
 
     const dl = await supa.storage.from('boletas').download(g.imagen_path);
     if (dl.error || !dl.data) throw new Error('No se pudo leer la foto de Storage.');
@@ -67,7 +62,7 @@ Deno.serve(async (req) => {
 
     // El Sheet es best-effort: que falle no invalida la subida de la boleta.
     try {
-      await syncSheet(token, supa, cfg.drive_parent_id);
+      await syncSheet(token, supa, raiz);
     } catch (e) {
       console.error('sheet sync:', String(e));
     }
