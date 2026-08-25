@@ -1,10 +1,72 @@
 // Cliente REST a mano. Es poco código y evita depender de un CDN, que en una
 // app offline-first sería justo lo que falla cuando más la necesitas.
+//
+// Desde que la app vive en la web, la anon key ya no abre nada: las políticas
+// exigen una sesión iniciada. La anon key solo sirve como llave de la puerta
+// de entrada (el endpoint de auth).
 import { URL_SUPA, ANON } from './config.js';
 
-const cabeceras = (extra = {}) => ({
+const CLAVE_SESION = 'nutria_sesion';
+let sesion = null;
+try { sesion = JSON.parse(localStorage.getItem(CLAVE_SESION) || 'null'); } catch { /* nada */ }
+
+export const haySesion = () => !!sesion?.refresh_token;
+
+function guardar(j) {
+  sesion = {
+    access_token: j.access_token,
+    refresh_token: j.refresh_token,
+    // expires_at viene en segundos; si falta, se asume una hora
+    expira: j.expires_at || Math.floor(Date.now() / 1000) + (j.expires_in || 3600),
+  };
+  localStorage.setItem(CLAVE_SESION, JSON.stringify(sesion));
+}
+
+export async function entrar(email, password) {
+  const r = await fetch(`${URL_SUPA}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: { apikey: ANON, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email.trim(), password }),
+  });
+  const j = await r.json();
+  if (!j.access_token) {
+    throw new Error(j.error_description || j.msg || j.message || 'Correo o contraseña incorrectos');
+  }
+  guardar(j);
+}
+
+export function salir() {
+  sesion = null;
+  localStorage.removeItem(CLAVE_SESION);
+}
+
+async function refrescar() {
+  const r = await fetch(`${URL_SUPA}/auth/v1/token?grant_type=refresh_token`, {
+    method: 'POST',
+    headers: { apikey: ANON, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh_token: sesion.refresh_token }),
+  });
+  const j = await r.json();
+  if (!j.access_token) throw new Error('sesión vencida');
+  guardar(j);
+}
+
+/**
+ * Devuelve un token válido. Si el refresco falla por falta de red, se entrega
+ * el que había: sin señal da igual que esté vencido, y evita cerrar la sesión
+ * de alguien que solo está en el ascensor.
+ */
+async function token() {
+  if (!sesion) return ANON;
+  if (Math.floor(Date.now() / 1000) > sesion.expira - 60) {
+    try { await refrescar(); } catch { /* se sigue con el viejo */ }
+  }
+  return sesion.access_token;
+}
+
+const cabeceras = async (extra = {}) => ({
   apikey: ANON,
-  Authorization: `Bearer ${ANON}`,
+  Authorization: `Bearer ${await token()}`,
   'Content-Type': 'application/json',
   ...extra,
 });
@@ -12,7 +74,7 @@ const cabeceras = (extra = {}) => ({
 export async function rest(ruta, opciones = {}) {
   const r = await fetch(`${URL_SUPA}/rest/v1/${ruta}`, {
     ...opciones,
-    headers: cabeceras(opciones.headers),
+    headers: await cabeceras(opciones.headers),
   });
   if (!r.ok) throw new Error(`${r.status}: ${(await r.text()).slice(0, 180)}`);
   return r.status === 204 ? null : r.json();
@@ -21,7 +83,7 @@ export async function rest(ruta, opciones = {}) {
 export async function fn(nombre, cuerpo) {
   const r = await fetch(`${URL_SUPA}/functions/v1/${nombre}`, {
     method: 'POST',
-    headers: cabeceras(),
+    headers: await cabeceras(),
     body: JSON.stringify(cuerpo ?? {}),
   });
   const j = await r.json().catch(() => ({}));

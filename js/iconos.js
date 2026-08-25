@@ -37,9 +37,9 @@ export const iconos = {
 export function nutria(tam = 40, color = 'currentColor') {
   return `<svg viewBox="0 0 64 64" width="${tam}" height="${tam}" aria-hidden="true" fill="none">
     <g fill="${color}">
-      <ellipse cx="19.5" cy="15.5" rx="7.4" ry="7.6"/>
-      <ellipse cx="44.5" cy="15.5" rx="7.4" ry="7.6"/>
-      <ellipse cx="32" cy="34" rx="22.5" ry="21"/>
+      <ellipse cx="16.5" cy="16.5" rx="5.6" ry="5.8"/>
+      <ellipse cx="47.5" cy="16.5" rx="5.6" ry="5.8"/>
+      <ellipse cx="32" cy="35" rx="23.5" ry="20"/>
     </g>
     <ellipse cx="32" cy="41.5" rx="13.2" ry="10.4" fill="#FFFDF8" opacity=".95"/>
     <circle cx="23.6" cy="30.5" r="3.05" fill="#1B211E"/>
@@ -59,9 +59,9 @@ export function nutria(tam = 40, color = 'currentColor') {
 export function nutriaDormida(tam = 64, color = 'currentColor') {
   return `<svg viewBox="0 0 64 64" width="${tam}" height="${tam}" aria-hidden="true" fill="none">
     <g fill="${color}" opacity=".5">
-      <ellipse cx="19.5" cy="17.5" rx="7" ry="7.2"/>
-      <ellipse cx="44.5" cy="17.5" rx="7" ry="7.2"/>
-      <ellipse cx="32" cy="35" rx="22" ry="20.5"/>
+      <ellipse cx="16.5" cy="18.5" rx="5.4" ry="5.6"/>
+      <ellipse cx="47.5" cy="18.5" rx="5.4" ry="5.6"/>
+      <ellipse cx="32" cy="36" rx="23" ry="19.5"/>
     </g>
     <ellipse cx="32" cy="42" rx="12.8" ry="10" fill="var(--card)" opacity=".9"/>
     <path d="M20.4 31.5c1.1-1.4 4.3-1.4 5.4 0M38.2 31.5c1.1-1.4 4.3-1.4 5.4 0"

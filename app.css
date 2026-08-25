@@ -293,6 +293,9 @@ button { cursor: pointer; }
   transition: transform .14s ease;
 }
 .flotante:active { transform: scale(.9); }
+/* .flotante define display:grid y con la misma especificidad le ganaba a
+   [hidden] del navegador, asi que hay que decirlo explicitamente */
+.flotante[hidden] { display: none; }
 
 /* ---------- Hoja modal ---------- */
 
@@ -446,4 +449,28 @@ textarea.entrada { resize: none; min-height: 62px; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+/* ---------- Pantalla de entrada ---------- */
+
+.portada {
+  min-height: 82dvh;
+  display: grid; align-content: center; justify-items: center;
+  gap: 5px; text-align: center;
+  padding: 20px 4px;
+}
+.marca-portada { color: var(--acento); margin-bottom: 6px; }
+.portada h1 {
+  font-size: 30px; font-weight: 800; letter-spacing: -.03em;
+  margin: 0;
+}
+.portada > p {
+  color: var(--ink-3); font-size: 14.5px;
+  margin: 0 0 22px; max-width: 30ch;
+}
+.portada form { width: 100%; max-width: 340px; display: grid; gap: 10px; }
+.portada form .btn { margin-top: 4px; }
+.portada > small {
+  color: var(--ink-3); font-size: 12.5px;
+  margin-top: 20px; max-width: 30ch;
 }

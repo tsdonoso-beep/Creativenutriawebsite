@@ -350,6 +350,31 @@ function vTareas() {
   </div>`;
 }
 
+function vEntrar(error = '') {
+  return `
+  <div class="portada deslizar-entrada">
+    <div class="marca-portada">${nutria(76, 'currentColor')}</div>
+    <h1>La Nutria App</h1>
+    <p>Los gastos, la lista de compras y las tareas de la casa, en un solo lugar.</p>
+    <form data-form="entrar">
+      <input class="entrada" name="email" type="email" inputmode="email"
+             autocomplete="username" placeholder="Correo de la casa" required>
+      <input class="entrada" name="password" type="password"
+             autocomplete="current-password" placeholder="Contraseña" required>
+      <button class="btn acento" type="submit">Entrar</button>
+      ${error ? `<div class="aviso malo" style="margin:12px 0 0">${escapar(error)}</div>` : ''}
+    </form>
+    <small>Una sola cuenta para los dos. Se queda guardada en este teléfono.</small>
+  </div>`;
+}
+
+function pintarEntrar(error = '') {
+  $('#cabecera').innerHTML = '';
+  $('#tabbar').innerHTML = '';
+  $('#flotante').hidden = true;
+  $('#vista').innerHTML = vEntrar(error);
+}
+
 // --------------------------------------------------------------------- hojas
 
 function abrirHoja(html) {
@@ -377,7 +402,8 @@ function hojaUsuario() {
             <div class="fila-sub">Le toca el ${plata(u.porcentaje_default)}% de los gastos</div>
           </div>
         </button>`).join('')}
-    </div>`);
+    </div>
+    <button class="btn fantasma" data-accion="salir" style="margin-top:14px">Cerrar sesión</button>`);
 }
 
 function hojaGasto(prefill = {}) {
@@ -556,6 +582,13 @@ document.addEventListener('click', async (ev) => {
   if (accion === 'ir') { vibrar(); estado.vista = vista; pintar(); }
 
   if (accion === 'cerrar-hoja') cerrarHoja();
+
+  if (accion === 'salir') {
+    api.salir();
+    localStorage.removeItem('nutria_usuario');
+    cerrarHoja();
+    pintarEntrar();
+  }
   if (accion === 'cambiar-usuario') hojaUsuario();
 
   if (accion === 'elegir-usuario') {
@@ -663,6 +696,19 @@ document.addEventListener('submit', async (ev) => {
   const form = ev.target;
   ev.preventDefault();
 
+  if (form.dataset.form === 'entrar') {
+    const btn = form.querySelector('[type="submit"]');
+    btn.disabled = true;
+    btn.textContent = 'Entrando…';
+    try {
+      await api.entrar(form.email.value, form.password.value);
+      await arrancar();
+    } catch (e) {
+      pintarEntrar(e.message);
+    }
+    return;
+  }
+
   if (form.dataset.form === 'item') {
     const nombre = form.nombre.value.trim();
     if (!nombre) return;
@@ -736,14 +782,29 @@ setInterval(() => vaciarCola(false), REINTENTO_MS);
 // --------------------------------------------------------------------- arranque
 
 async function arrancar() {
+  if (!api.haySesion()) { pintarEntrar(); return; }
+
   try {
     [estado.usuarios, estado.categorias] = await Promise.all([
       api.traerUsuarios(), api.traerCategorias(),
     ]);
-  } catch {
+  } catch (e) {
+    // Un 401 es sesión vencida; cualquier otra cosa, falta de red
+    if (String(e.message).startsWith('401')) {
+      api.salir();
+      pintarEntrar('Tu sesión venció. Entra otra vez.');
+      return;
+    }
     $('#vista').innerHTML = `<div class="vacio">${nutriaDormida(72)}
       <strong>Sin conexión</strong>
       <p>Abre la app con señal la primera vez para descargar los datos.</p></div>`;
+    return;
+  }
+
+  // Sin usuarios visibles la sesión no sirve de nada: las políticas la rechazan
+  if (!estado.usuarios.length) {
+    api.salir();
+    pintarEntrar('Esa cuenta no tiene acceso. Revisa el correo y la contraseña.');
     return;
   }
 
