@@ -119,6 +119,13 @@ export const traerLista = () =>
 export const traerTareas = () =>
   rest('v_tareas_pendientes?order=proxima_fecha.asc,orden.asc');
 
+export const traerTipos = () =>
+  rest('tipos?activo=eq.true&order=orden&select=id,nombre,descripcion,reparto_default,color');
+
+/** Los servicios del periodo, ya ordenados por urgencia de pago. */
+export const traerServicios = (periodo) =>
+  rest(`v_servicios?periodo=eq.${periodo}&order=fecha_vencimiento.asc`);
+
 // ---------- Escrituras ----------
 
 export const guardarGasto = (payload) => fn('gasto-guardar', payload);
@@ -148,6 +155,37 @@ export const borrarComprados = () =>
 
 export const completarTarea = (p_tarea_id, p_usuario_id) =>
   rpc('completar_tarea', { p_tarea_id, p_usuario_id });
+
+export const leerRecibo = (archivo) => fn('recibo-leer', { archivo });
+
+export const guardarRecibo = (pago_id, archivo, ocr) =>
+  fn('recibo-guardar', { pago_id, archivo, ocr });
+
+export const generarPagos = (p_periodo) => rpc('generar_pagos_mes', { p_periodo });
+
+export const pagarServicio = (p_pago_id, p_usuario_id, p_monto, p_fecha, p_pagado_por) =>
+  rpc('pagar_servicio', { p_pago_id, p_usuario_id, p_monto, p_fecha, p_pagado_por });
+
+export const guardarComprobante = (pago_id, cambios) =>
+  rest(`servicio_pagos?id=eq.${pago_id}`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify(cambios),
+  });
+
+export const crearServicio = (servicio) =>
+  rest('servicios', {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify(servicio),
+  });
+
+export const actualizarServicio = (id, cambios) =>
+  rest(`servicios?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify(cambios),
+  });
 
 export const crearTarea = (tarea) =>
   rest('tareas', {

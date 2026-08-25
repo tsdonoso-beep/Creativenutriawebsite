@@ -27,6 +27,9 @@ export const iconos = {
   ropa:      trazo('<path d="M9 4.4 4.6 7.2l1.6 3.4 1.8-.9v9.9h8v-9.9l1.8.9 1.6-3.4L15 4.4a3.1 3.1 0 0 1-6 0z"/>'),
   sabanas:   trazo('<path d="M3.4 17.4v-6a3 3 0 0 1 3-3h11.2a3 3 0 0 1 3 3v6"/><path d="M3.4 17.4h17.2v3H3.4z"/><path d="M7.4 8.4V6.6a1.8 1.8 0 0 1 1.8-1.8h5.6a1.8 1.8 0 0 1 1.8 1.8v1.8"/>'),
   cocina:    trazo('<path d="M4.6 9.4h14.8v9.6a1.4 1.4 0 0 1-1.4 1.4H6a1.4 1.4 0 0 1-1.4-1.4z"/><path d="M4.6 9.4V6.4a1.4 1.4 0 0 1 1.4-1.4h12a1.4 1.4 0 0 1 1.4 1.4v3"/><path d="M8.4 13.4v3M12 13.4v3M15.6 13.4v3"/>'),
+  calendario: trazo('<rect x="3.6" y="5.4" width="16.8" height="15" rx="2.2"/><path d="M3.6 10h16.8M8.4 3.4v3.4M15.6 3.4v3.4"/><path d="M8.4 14h2M13.6 14h2"/>'),
+  alerta:     trazo('<path d="M12 4.2 21 19.4H3z"/><path d="M12 10v4M12 16.6v.1"/>'),
+  subir:      trazo('<path d="M12 16.4V4.6"/><path d="m7.4 9.2 4.6-4.6 4.6 4.6"/><path d="M4.6 15.4v3a1.6 1.6 0 0 0 1.6 1.6h11.6a1.6 1.6 0 0 0 1.6-1.6v-3"/>'),
   tarea:     trazo('<path d="M5.4 4.6h13.2v15.8H5.4z"/><path d="m8.6 11.4 2 2 4.2-4.2"/>'),
 };
 

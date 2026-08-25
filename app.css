@@ -474,3 +474,90 @@ textarea.entrada { resize: none; min-height: 62px; }
   color: var(--ink-3); font-size: 12.5px;
   margin-top: 20px; max-width: 30ch;
 }
+
+/* ---------- Barra de distribución ----------
+   Segmentos separados por 2px de superficie y extremos redondeados, como la
+   barra de almacenamiento de iOS. La identidad nunca depende solo del color:
+   siempre va acompañada de su leyenda con nombre y monto. */
+
+.barra-dist {
+  display: flex; gap: 2px;
+  height: 14px; margin: 14px 0 13px;
+  border-radius: 7px;
+}
+.barra-dist > span {
+  display: block; height: 100%;
+  border-radius: 2px;
+  min-width: 4px;
+}
+.barra-dist > span:first-child { border-radius: 7px 2px 2px 7px; }
+.barra-dist > span:last-child  { border-radius: 2px 7px 7px 2px; }
+.barra-dist > span:only-child  { border-radius: 7px; }
+
+.leyenda {
+  display: flex; flex-wrap: wrap;
+  gap: 7px 15px;
+}
+.leyenda > span {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 13px; color: var(--ink-2);
+}
+.leyenda i {
+  width: 9px; height: 9px; border-radius: 999px; flex: none;
+}
+.leyenda b {
+  color: var(--ink); font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Quién puso cuánto ---------- */
+
+.aporte {
+  display: flex; justify-content: space-between;
+  gap: 12px; margin-top: 3px;
+}
+.aporte > div { flex: 1; min-width: 0; }
+.aporte .quien {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 13.5px; font-weight: 600; color: var(--ink-2);
+}
+.aporte .cuanto {
+  font-size: 21px; font-weight: 750; letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums; margin-top: 2px;
+}
+.aporte .pct { font-size: 13px; color: var(--ink-3); font-weight: 600; }
+.aporte .meta { font-size: 12px; color: var(--ink-3); }
+.aporte > div:last-child { text-align: right; }
+.aporte > div:last-child .quien { justify-content: flex-end; }
+
+/* ---------- Servicios ---------- */
+
+.serv-dias {
+  display: flex; flex-direction: column; align-items: flex-end;
+  flex: none; min-width: 68px;
+}
+.serv-dias .n {
+  font-size: 19px; font-weight: 780; line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.serv-dias .u { font-size: 11px; color: var(--ink-3); font-weight: 600; }
+.serv-dias.vencido .n { color: var(--rojo); }
+.serv-dias.hoy .n     { color: var(--acento); }
+.serv-dias.pagado .n  { color: var(--verde); font-size: 15px; }
+
+.serv-fecha {
+  font-size: 12.5px; font-weight: 650;
+  color: var(--ink-3); letter-spacing: .02em;
+}
+.serv-fecha.vencido { color: var(--rojo); }
+.serv-fecha.hoy     { color: var(--acento); }
+
+.cinta {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 700; letter-spacing: .02em;
+}
+.cinta.vencido { background: var(--rojo-tinte);   color: var(--rojo); }
+.cinta.hoy     { background: var(--acento-tinte); color: var(--acento); }
+.cinta.pagado  { background: var(--verde-tinte);  color: var(--verde); }
+.cinta.proximo { background: var(--card-2);       color: var(--ink-3); }
