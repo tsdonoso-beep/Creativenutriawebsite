@@ -616,7 +616,10 @@ function hojaUsuario() {
 
 /** Las categorias del tipo elegido. Al cambiar de tipo se vuelven a pintar. */
 function pastillasCategoria(tipoId, seleccionada) {
-  const cats = estado.categorias.filter((c) => c.tipo_id === tipoId);
+  let cats = estado.categorias.filter((c) => c.tipo_id === tipoId);
+  // Nunca dejar el formulario sin categorias: un gasto sin categoria
+  // desaparece del resumen y de la barra de distribucion.
+  if (!cats.length) cats = estado.categorias;
   return cats.map((c, i) => `
     <button type="button" class="pastilla" data-valor="${c.id}"
       aria-pressed="${seleccionada ? seleccionada === c.id : i === 0}">

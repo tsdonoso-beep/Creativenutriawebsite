@@ -100,7 +100,7 @@ export const traerUsuarios = () =>
   rest('usuarios?activo=eq.true&order=orden&select=id,nombre,emoji,color,porcentaje_default');
 
 export const traerCategorias = () =>
-  rest('categorias?activo=eq.true&order=orden&select=id,nombre,emoji');
+  rest('categorias?activo=eq.true&order=orden&select=id,nombre,emoji,tipo_id');
 
 export const traerGastos = (periodo, limite = 60) =>
   rest(`v_gastos_detalle?periodo=eq.${periodo}&order=fecha_gasto.desc,fecha_registro.desc&limit=${limite}`);
