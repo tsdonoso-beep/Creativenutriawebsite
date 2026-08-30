@@ -1,8 +1,16 @@
-// Service worker: cachea el armazón para que la app abra sin señal.
-// Las llamadas a Supabase nunca se cachean — datos viejos servidos como
-// frescos serían peor que un error honesto. De esos se encarga la cola.
+// Service worker: la app abre sin señal, pero sin quedarse atrás.
+//
+// La primera versión servía del caché y actualizaba por detrás, así que un
+// arreglo recién publicado no se veía hasta la segunda apertura. Para una app
+// en la que se corrigen cosas seguido eso es una trampa: pruebas algo que
+// todavía no tienes. Ahora el armazón va primero a la red y el caché queda
+// como respaldo para cuando no hay señal. Son cinco archivos de unos pocos KB;
+// la frescura vale más que los milisegundos que ahorraría.
+//
+// Las llamadas a Supabase nunca se cachean: datos viejos servidos como frescos
+// serían peor que un error honesto. De esos se encarga la cola.
 
-const CACHE = 'nutria-v1';
+const CACHE = 'nutria-v2';
 const ARMAZON = [
   './', './index.html', './app.css', './manifest.json',
   './js/app.js', './js/api.js', './js/cola.js', './js/config.js', './js/iconos.js',
@@ -32,14 +40,16 @@ self.addEventListener('fetch', (ev) => {
   if (url.origin !== self.location.origin) return;
   if (ev.request.method !== 'GET') return;
 
-  // Del caché primero, y de paso se refresca por detrás
+  // Red primero, y si no hay, lo guardado
   ev.respondWith(
-    caches.match(ev.request).then((guardada) => {
-      const red = fetch(ev.request).then((r) => {
-        if (r.ok) caches.open(CACHE).then((c) => c.put(ev.request, r.clone()));
+    fetch(ev.request)
+      .then((r) => {
+        if (r.ok) {
+          const copia = r.clone();
+          caches.open(CACHE).then((c) => c.put(ev.request, copia));
+        }
         return r;
-      }).catch(() => guardada);
-      return guardada || red;
-    }),
+      })
+      .catch(() => caches.match(ev.request).then((g) => g || caches.match('./index.html'))),
   );
 });

@@ -1298,7 +1298,22 @@ async function arrancar() {
 }
 
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  window.addEventListener('load', async () => {
+    try {
+      // updateViaCache none: el navegador no debe servir el sw.js viejo desde
+      // su propio cache, o las actualizaciones nunca llegarian.
+      const reg = await navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' });
+      reg.update();
+      // Si entra una version nueva mientras la app esta abierta, se recarga
+      // sola en cuanto toma el control.
+      let recargando = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (recargando) return;
+        recargando = true;
+        location.reload();
+      });
+    } catch { /* sin service worker se sigue funcionando, solo que sin offline */ }
+  });
 }
 
 arrancar();
