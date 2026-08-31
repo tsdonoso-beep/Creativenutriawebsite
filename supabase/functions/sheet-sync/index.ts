@@ -16,8 +16,12 @@ const json = (b: unknown, s = 200) =>
  * El JWT ya lo verifico el gateway; aqui solo se lee que rol trae.
  */
 function sinSesion(req: Request): string | null {
+  const t = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+  // Las funciones se llaman entre si con la clave de servicio. Esa clave no
+  // siempre es un JWT, asi que se compara directo antes de intentar leerla
+  // como token: sin esto, la guardia rompe los reintentos internos.
+  if (t && t === Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')) return null;
   try {
-    const t = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
     const cuerpo = t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
     const relleno = cuerpo + '='.repeat((4 - cuerpo.length % 4) % 4);
     const rol = JSON.parse(atob(relleno)).role;
