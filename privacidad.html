@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Política de privacidad · La Nutria App</title>
+<link rel="stylesheet" href="app.css">
+<style>
+  .doc { max-width: 40rem; margin: 0 auto; padding: 40px 20px 80px; }
+  .doc h1 { font-size: 30px; font-weight: 800; letter-spacing: -.03em; margin: 0 0 6px; }
+  .doc .fecha { color: var(--ink-3); font-size: 13.5px; margin-bottom: 28px; }
+  .doc h2 { font-size: 18px; font-weight: 720; margin: 30px 0 8px; letter-spacing: -.015em; }
+  .doc p, .doc li { color: var(--ink-2); line-height: 1.65; }
+  .doc ul { padding-left: 20px; }
+  .doc a { color: var(--acento); }
+</style>
+</head>
+<body>
+<div class="doc">
+  <h1>Política de privacidad</h1>
+  <div class="fecha">La Nutria App · actualizada el 30 de agosto de 2026</div>
+
+  <p>La Nutria App es una aplicación privada de uso doméstico. La usan dos
+  personas para llevar los gastos, la lista de compras y las tareas de su casa.
+  No se ofrece al público, no tiene registro abierto y no hay forma de crear una
+  cuenta sin ser autorizado.</p>
+
+  <h2>Qué datos se guardan</h2>
+  <ul>
+    <li>Los gastos que los usuarios registran: monto, fecha, comercio, categoría y quién pagó.</li>
+    <li>Las fotos de boletas y los recibos de servicios que los usuarios suben.</li>
+    <li>La lista de compras y las tareas del hogar.</li>
+    <li>El correo electrónico de las dos personas autorizadas, usado solo para iniciar sesión.</li>
+  </ul>
+
+  <h2>Dónde se guardan</h2>
+  <p>Los datos viven en una base de datos privada de Supabase, protegida con
+  políticas que exigen sesión iniciada y que además restringen el acceso a una
+  lista cerrada de correos autorizados.</p>
+
+  <h2>Qué se hace con Google Drive</h2>
+  <p>La aplicación usa el permiso <code>drive.file</code> de Google Drive, que
+  da acceso <strong>únicamente a los archivos que la propia aplicación crea</strong>.
+  No puede ver, leer ni modificar ningún otro archivo del Drive del usuario.</p>
+  <p>Lo que hace con ese permiso es una sola cosa: guardar en una carpeta propia
+  las fotos de boletas y los recibos que el usuario sube, junto con una hoja de
+  cálculo que resume los gastos. Nada más.</p>
+
+  <h2>Con quién se comparten</h2>
+  <p>Con nadie. Los datos no se venden, no se ceden, no se usan para publicidad
+  y no se comparten con terceros con fines comerciales.</p>
+  <p>Las fotos de boletas se envían a la API de Google Gemini con un único
+  propósito: leer el monto y el comercio para no tener que escribirlos a mano.
+  No se usan para entrenar modelos ni se conservan en ese servicio.</p>
+
+  <h2>Cuánto tiempo se conservan</h2>
+  <p>Mientras los usuarios los quieran. Pueden borrar cualquier gasto, recibo o
+  archivo cuando lo decidan, y pueden pedir que se elimine todo el contenido.</p>
+
+  <h2>Contacto</h2>
+  <p>Para cualquier consulta sobre estos datos:
+  <a href="mailto:tsdonoso@gmail.com">tsdonoso@gmail.com</a>.</p>
+
+  <p style="margin-top:34px"><a href="./">← Volver a la aplicación</a></p>
+</div>
+</body>
+</html>

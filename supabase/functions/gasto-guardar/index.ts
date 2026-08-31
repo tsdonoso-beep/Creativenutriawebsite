@@ -110,6 +110,8 @@ Deno.serve(async (req) => {
       imagen_path,
       mime,
       drive_estado: imagen_path ? 'pendiente' : 'sin_foto',
+      ocr_json: b.ocr ?? null,
+      confianza_ocr: b.ocr?.confianza ?? null,
     }).select('id, monto_pen, drive_estado').single();
 
     if (error) return json({ error: error.message }, 400);
@@ -135,7 +137,32 @@ Deno.serve(async (req) => {
       }
     }
 
-    return json({ ok: true, id: g.id, monto_pen: g.monto_pen, drive_estado: g.drive_estado });
+    // El detalle de la boleta. Gemini ya lo leia; hasta ahora se descartaba,
+    // y con el se puede responder cuanto costo el queso la ultima vez.
+    const items = Array.isArray(b.items) ? b.items
+                : Array.isArray(b.ocr?.items) ? b.ocr.items
+                : [];
+    if (items.length) {
+      const filas = items.slice(0, 60)
+        .filter((it: any) => it && (it.nombre || it.precio != null))
+        .map((it: any, i: number) => ({
+          gasto_id: g.id,
+          nombre: String(it.nombre ?? 'Producto').trim().slice(0, 120) || 'Producto',
+          cantidad: Number.isFinite(Number(it.cantidad)) ? Number(it.cantidad) : null,
+          precio: Number.isFinite(Number(it.precio)) ? Number(it.precio) : null,
+          orden: i,
+        }));
+      if (filas.length) {
+        const ins = await supa.from('gasto_items').insert(filas);
+        // Que falle el detalle no debe tumbar el gasto, que es lo importante
+        if (ins.error) console.error('items:', ins.error.message);
+      }
+    }
+
+    return json({
+      ok: true, id: g.id, monto_pen: g.monto_pen,
+      drive_estado: g.drive_estado, items: items.length,
+    });
   } catch (e) {
     return json({ error: String((e as any)?.message || e) }, 500);
   }

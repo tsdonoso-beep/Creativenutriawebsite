@@ -12,9 +12,24 @@ const json = (b: unknown, s = 200) =>
 
 const MAX_INTENTOS = 5;
 
+/** Rechaza a quien llega solo con la anon key. */
+function sinSesion(req: Request): string | null {
+  try {
+    const t = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+    const cuerpo = t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const relleno = cuerpo + '='.repeat((4 - cuerpo.length % 4) % 4);
+    return JSON.parse(atob(relleno)).role === 'anon' ? 'Necesitas iniciar sesion.' : null;
+  } catch {
+    return 'Falta la sesion.';
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   try {
+    const veto = sinSesion(req);
+    if (veto) return json({ error: veto }, 401);
+
     const supa = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
@@ -48,7 +63,38 @@ Deno.serve(async (req) => {
       }
     }
 
-    return json({ ok: true, revisados: (pendientes || []).length, subidos, fallidos });
+    // Los recibos de servicios tambien se quedaban colgados: antes esta
+    // funcion solo miraba los gastos, asi que un recibo que no llegaba a
+    // Drive no lo reintentaba nadie.
+    const { data: recibos } = await supa
+      .from('servicio_pagos').select('id')
+      .in('drive_estado', ['pendiente', 'error'])
+      .not('comprobante_path', 'is', null)
+      .lt('drive_intentos', MAX_INTENTOS)
+      .limit(20);
+
+    const urlRecibo = `${Deno.env.get('SUPABASE_URL')}/functions/v1/recibo-guardar`;
+    let recibosSubidos = 0;
+    for (const p of recibos || []) {
+      try {
+        const res = await fetch(urlRecibo, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: auth },
+          body: JSON.stringify({ pago_id: p.id }),
+        });
+        const r = await res.json();
+        if (r.ok) recibosSubidos++;
+        else fallidos.push(p.id);
+      } catch {
+        fallidos.push(p.id);
+      }
+    }
+
+    return json({
+      ok: true,
+      revisados: (pendientes || []).length + (recibos || []).length,
+      subidos, recibos_subidos: recibosSubidos, fallidos,
+    });
   } catch (e) {
     return json({ error: String((e as any)?.message || e) }, 500);
   }

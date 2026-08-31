@@ -55,9 +55,7 @@ Deno.serve(async (req) => {
   let pago: any = null;
   try {
     const b = await req.json();
-    if (!b.pago_id || !b.archivo?.base64) {
-      return json({ error: 'Falta el pago o el archivo.' }, 400);
-    }
+    if (!b.pago_id) return json({ error: 'Falta el pago.' }, 400);
 
     const r = await supa.from('servicio_pagos').select('*').eq('id', b.pago_id).single();
     pago = r.data;
@@ -66,30 +64,47 @@ Deno.serve(async (req) => {
     const { data: serv } = await supa
       .from('servicios').select('nombre, proveedor').eq('id', pago.servicio_id).single();
 
-    const mime = b.archivo.mime || 'application/pdf';
-    const ext = extDe(mime);
-    const bytes = bytesDe(b.archivo.base64);
+    let mime: string;
+    let ext: string;
+    let bytes: Uint8Array;
+    let ruta: string;
 
-    // Storage primero: si Drive falla, el comprobante no se pierde
-    const ruta = `servicios/${pago.periodo}/${pago.id}.${ext}`;
-    const up = await supa.storage.from('boletas')
-      .upload(ruta, bytes, { contentType: mime, upsert: true });
-    if (up.error) return json({ error: 'No se pudo guardar el archivo: ' + up.error.message }, 500);
+    if (b.archivo?.base64) {
+      // Subida normal: llega el archivo desde el telefono
+      mime = b.archivo.mime || 'application/pdf';
+      ext = extDe(mime);
+      bytes = bytesDe(b.archivo.base64);
+      ruta = `servicios/${pago.periodo}/${pago.id}.${ext}`;
 
-    const cambios: Record<string, unknown> = {
-      comprobante_path: ruta,
-      mime,
-      drive_estado: 'pendiente',
-    };
-    if (b.ocr) {
-      cambios.ocr_json = b.ocr;
-      cambios.confianza_ocr = b.ocr.confianza ?? null;
-      if (b.ocr.consumo != null) {
-        cambios.consumo = b.ocr.consumo;
-        cambios.unidad_consumo = b.ocr.unidad_consumo ?? null;
+      // Storage primero: si Drive falla, el comprobante no se pierde
+      const up = await supa.storage.from('boletas')
+        .upload(ruta, bytes, { contentType: mime, upsert: true });
+      if (up.error) return json({ error: 'No se pudo guardar el archivo: ' + up.error.message }, 500);
+
+      const cambios: Record<string, unknown> = {
+        comprobante_path: ruta, mime, drive_estado: 'pendiente',
+      };
+      if (b.ocr) {
+        cambios.ocr_json = b.ocr;
+        cambios.confianza_ocr = b.ocr.confianza ?? null;
+        if (b.ocr.consumo != null) {
+          cambios.consumo = b.ocr.consumo;
+          cambios.unidad_consumo = b.ocr.unidad_consumo ?? null;
+        }
       }
+      await supa.from('servicio_pagos').update(cambios).eq('id', pago.id);
+    } else {
+      // Reintento: el archivo ya vive en Storage de un intento anterior
+      if (!pago.comprobante_path) {
+        return json({ error: 'Ese pago no tiene comprobante guardado.' }, 400);
+      }
+      ruta = pago.comprobante_path;
+      mime = pago.mime || 'application/pdf';
+      ext = extDe(mime);
+      const dl = await supa.storage.from('boletas').download(ruta);
+      if (dl.error || !dl.data) throw new Error('No se pudo leer el comprobante de Storage.');
+      bytes = new Uint8Array(await dl.data.arrayBuffer());
     }
-    await supa.from('servicio_pagos').update(cambios).eq('id', pago.id);
 
     // Y ahora a Drive, en su propia rama del arbol
     const token = await getAccessToken(supa);

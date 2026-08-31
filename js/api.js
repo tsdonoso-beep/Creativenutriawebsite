@@ -163,6 +163,16 @@ export const guardarRecibo = (pago_id, archivo, ocr) =>
 
 export const generarPagos = (p_periodo) => rpc('generar_pagos_mes', { p_periodo });
 
+/** El desglose de una boleta: que se compro y a cuanto. */
+export const traerItems = (gasto_id) =>
+  rest(`gasto_items?gasto_id=eq.${gasto_id}&order=orden&select=nombre,cantidad,precio`);
+
+/** Historial de precios de un producto, para saber si subio. */
+export const traerPrecios = (busqueda) =>
+  rest(`v_precios_productos?producto=ilike.*${encodeURIComponent(busqueda)}*&order=ultima_compra.desc&limit=30`);
+
+export const reintentarDrive = () => fn('drive-reintentos', {});
+
 export const pagarServicio = (p_pago_id, p_usuario_id, p_monto, p_fecha, p_pagado_por) =>
   rpc('pagar_servicio', { p_pago_id, p_usuario_id, p_monto, p_fecha, p_pagado_por });
 

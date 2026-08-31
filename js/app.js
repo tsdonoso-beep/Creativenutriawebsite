@@ -249,8 +249,18 @@ function vInicio() {
       ? `${escapar(otro?.nombre || '')} te debe`
       : `Le debes a ${escapar(otro?.nombre || '')}`;
 
+  const sinSubir = (estado.d.gastos || [])
+    .filter((g) => g.drive_estado === 'error' || g.drive_estado === 'pendiente').length;
+
   return `
   <div class="deslizar-entrada">
+
+    ${sinSubir ? `
+      <div class="aviso malo" style="margin-bottom:14px">
+        ${iconos.alerta}
+        <span>${sinSubir} boleta${sinSubir > 1 ? 's' : ''} sin llegar a Drive.
+        Están guardadas y se suben solas al reconectar Google.</span>
+      </div>` : ''}
 
     <div class="tarjeta">
       <div class="saludo" style="letter-spacing:.08em">EN QUÉ SE FUE ${mesLargo(estado.periodo).toUpperCase()}</div>
@@ -455,7 +465,7 @@ function vGastos() {
       <div class="tarjeta">
         <div class="tarjeta-cab"><h2 style="font-size:15px;color:var(--ink-3)">${fechaCorta(fecha)}</h2></div>
         ${items.map((g) => `
-          <div class="fila">
+          <div class="fila" data-accion="abrir-gasto" data-id="${g.id}" role="button">
             <span class="chapa">${iconos.recibo}</span>
             <div class="fila-txt">
               <div class="fila-tit">${escapar(g.comercio || g.categoria || 'Gasto')}</div>
@@ -747,6 +757,56 @@ function hojaTarea() {
 }
 
 
+async function hojaDetalleGasto(gastoId) {
+  const g = (estado.d.gastos || []).find((x) => x.id === gastoId);
+  if (!g) return;
+
+  abrirHoja(`
+    <h2 id="hoja-titulo">${escapar(g.comercio || g.categoria || 'Gasto')}</h2>
+    <div class="monto-grande">${soles(g.monto_pen)}</div>
+    <div class="fila-sub" style="margin-bottom:16px">
+      ${escapar(fechaCorta(g.fecha_gasto))} · ${escapar(g.categoria || 'Sin categoría')}
+      · pagó ${escapar(g.pagado_por_nombre)}
+    </div>
+    <div id="detalle-items"><div class="fila-sub">Cargando el detalle…</div></div>
+    ${g.drive_url ? `<a class="btn suave" href="${g.drive_url}" target="_blank"
+        rel="noopener" style="margin-top:14px">Ver la boleta en Drive</a>` : ''}
+    <button class="btn fantasma" type="button" data-accion="cerrar-hoja">Cerrar</button>`);
+
+  try {
+    const items = await api.traerItems(gastoId);
+    const cont = $('#detalle-items');
+    if (!cont) return;
+    if (!items.length) {
+      cont.innerHTML = `<div class="aviso info">${iconos.destello}
+        Este gasto no tiene desglose. Solo lo tienen las boletas que se leyeron con foto.</div>`;
+      return;
+    }
+    const suma = items.reduce((a, i) => a + Number(i.precio || 0), 0);
+    cont.innerHTML = `
+      <div class="tarjeta plana" style="margin:0">
+        <div class="tarjeta-cab"><h2 style="font-size:15px;color:var(--ink-3)">
+          Qué se compró · ${items.length} producto${items.length > 1 ? 's' : ''}</h2></div>
+        ${items.map((i) => `
+          <div class="fila">
+            <div class="fila-txt">
+              <div class="fila-tit">${escapar(i.nombre)}</div>
+              ${i.cantidad ? `<div class="fila-sub">${escapar(i.cantidad)}</div>` : ''}
+            </div>
+            <div class="fila-val">${i.precio != null ? solesTxt(i.precio) : '—'}</div>
+          </div>`).join('')}
+      </div>
+      ${Math.abs(suma - Number(g.monto_pen)) > 0.5
+        ? `<div class="aviso info" style="margin-top:10px">${iconos.alerta}
+             Los productos suman ${solesTxt(suma)} y el total es ${solesTxt(g.monto_pen)}.
+             Puede haber descuentos o líneas que no se leyeron.</div>`
+        : ''}`;
+  } catch {
+    const cont = $('#detalle-items');
+    if (cont) cont.innerHTML = '<div class="fila-sub">No se pudo cargar el detalle.</div>';
+  }
+}
+
 function hojaServicio(servicio = null) {
   const editar = !!servicio;
   const mensual = estado.tipos.find((t) => t.reparto_default === 'default');
@@ -997,6 +1057,8 @@ document.addEventListener('click', async (ev) => {
 
   if (accion === 'abrir-servicio' && id) { vibrar(); hojaPagar(id); }
 
+  if (accion === 'abrir-gasto' && id) { vibrar(); hojaDetalleGasto(id); }
+
   if (accion === 'editar-servicio') {
     const s = (estado.d.servicios || []).find((x) => x.pago_id === id);
     if (s) hojaServicio(s);
@@ -1236,6 +1298,9 @@ document.addEventListener('submit', async (ev) => {
       fecha_gasto: form.fecha_gasto.value || hoy(),
       reparto_tipo: grupoValor(form, 'reparto_tipo'),
       foto: estado.fotoPendiente || undefined,
+      // La lectura de Gemini viaja entera: adentro van los productos con su
+      // precio, que antes se leian y se tiraban.
+      ocr: estado.lecturaIA || undefined,
     };
     const desdeLista = $('#hoja').dataset.desdeLista === '1';
     cerrarHoja();
@@ -1295,6 +1360,13 @@ async function arrancar() {
   await refrescar();
   if (!estado.usuario) hojaUsuario();
   vaciarCola(false);
+
+  // Rescatar lo que no llego a Drive en intentos anteriores. Sin esto una
+  // boleta que fallo se quedaba en Storage para siempre, porque el barrido
+  // solo corria si alguien lo disparaba a mano.
+  const colgados = (estado.d.gastos || [])
+    .some((g) => g.drive_estado === 'pendiente' || g.drive_estado === 'error');
+  if (colgados) api.reintentarDrive().catch(() => {});
 }
 
 if ('serviceWorker' in navigator) {
