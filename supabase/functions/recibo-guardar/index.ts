@@ -5,7 +5,7 @@
 // recibos se suben en casa, con wifi, no en la caja del supermercado. Aun asi
 // Storage va primero, para que un fallo de Drive no pierda el archivo.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { ensureFolder, ensureRoot, getAccessToken, sani, uploadFile } from './google.ts';
+import { ensureFolder, ensureRoot, esFalloDeConexion, getAccessToken, sani, uploadFile } from './google.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -132,10 +132,14 @@ Deno.serve(async (req) => {
   } catch (e) {
     const msg = String((e as any)?.message || e);
     if (pago?.id) {
+      // Mismo criterio que en gasto-a-drive: si lo que fallo fue la conexion
+      // con Google, el intento no se le cobra a este recibo.
       await supa.from('servicio_pagos').update({
         drive_estado: 'error',
         drive_error: msg.slice(0, 500),
-        drive_intentos: (pago.drive_intentos || 0) + 1,
+        drive_intentos: esFalloDeConexion(msg)
+          ? (pago.drive_intentos || 0)
+          : (pago.drive_intentos || 0) + 1,
       }).eq('id', pago.id);
     }
     // El archivo ya esta en Storage, asi que esto no es una perdida

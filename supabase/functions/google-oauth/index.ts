@@ -90,5 +90,21 @@ Deno.serve(async (req) => {
     actualizado_en: new Date().toISOString(),
   }).eq('id', 1);
 
-  return texto('Listo. Google conectado.\n\nLA NUTRIA APP ya puede guardar las boletas en tu Drive.\nPuedes cerrar esta ventana.');
+  // Reconectar revive la cola: mientras el token estuvo caido, cada barrido
+  // marco error en boletas que estaban perfectas. Sin este reset se quedan
+  // esperando a un reintento que ya nadie les va a dar.
+  const revivir = { drive_estado: 'pendiente', drive_error: null, drive_intentos: 0 };
+  const [g, s] = await Promise.all([
+    supa.from('gastos').update(revivir)
+      .eq('drive_estado', 'error').not('imagen_path', 'is', null).select('id'),
+    supa.from('servicio_pagos').update(revivir)
+      .eq('drive_estado', 'error').not('comprobante_path', 'is', null).select('id'),
+  ]);
+  const enCola = (g.data?.length || 0) + (s.data?.length || 0);
+
+  return texto(
+    'Listo. Google conectado.\n\nLA NUTRIA APP ya puede guardar las boletas en tu Drive.' +
+    (enCola ? `\n\nHay ${enCola} comprobante(s) en cola. Abre la app y se suben solos.` : '') +
+    '\nPuedes cerrar esta ventana.',
+  );
 });

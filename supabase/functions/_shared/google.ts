@@ -10,6 +10,17 @@
 // Este archivo se copia dentro de cada función que lo necesita: Supabase
 // despliega cada función como una unidad independiente.
 
+/**
+ * ¿El fallo es de la conexión con Google y no del archivo que se subía?
+ *
+ * Importa para el contador de reintentos: si el refresh_token murió, fallan
+ * TODAS las boletas por igual. Cobrarle el intento a cada archivo agota su
+ * presupuesto (MAX_INTENTOS) por algo que no tiene nada que ver con él, y al
+ * reconectar quedan abandonadas para siempre.
+ */
+export const esFalloDeConexion = (msg: string) =>
+  /refrescar el token de Google|invalid_grant|no está conectado|GOOGLE_OAUTH_CLIENT/.test(msg);
+
 /** Cambia el refresh_token guardado por un access_token fresco. */
 export async function getAccessToken(supa: any): Promise<string> {
   const { data } = await supa

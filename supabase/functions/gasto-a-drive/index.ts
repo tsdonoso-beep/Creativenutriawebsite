@@ -1,6 +1,6 @@
 // gasto-a-drive · sube la boleta de un gasto a Drive y refresca el Sheet.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { ensureFolder, ensureRoot, getAccessToken, sani, syncSheet, uploadFile } from './google.ts';
+import { ensureFolder, ensureRoot, esFalloDeConexion, getAccessToken, sani, syncSheet, uploadFile } from './google.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -95,10 +95,14 @@ Deno.serve(async (req) => {
   } catch (e) {
     const msg = String((e as any)?.message || e);
     if (g?.id) {
+      // Un fallo de conexion con Google no es culpa de esta boleta: no se le
+      // cobra el intento, o el token caido agota el presupuesto de todas.
       await supa.from('gastos').update({
         drive_estado: 'error',
         drive_error: msg.slice(0, 500),
-        drive_intentos: (g.drive_intentos || 0) + 1,
+        drive_intentos: esFalloDeConexion(msg)
+          ? (g.drive_intentos || 0)
+          : (g.drive_intentos || 0) + 1,
       }).eq('id', g.id);
     }
     return json({ error: msg }, 500);
