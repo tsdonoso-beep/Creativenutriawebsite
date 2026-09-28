@@ -109,7 +109,7 @@ const estado = {
   periodo: periodoDe(hoy()),
   vista: 'inicio',
   tipos: [],
-  d: { gastos: [], balance: [], total: [], resumen: [], lista: [], tareas: [], servicios: [] },
+  d: { gastos: [], balance: [], balanceMes: [], total: [], resumen: [], lista: [], tareas: [], servicios: [] },
   enCola: 0,
   cargando: true,
   fotoPendiente: null,
@@ -225,10 +225,16 @@ function cabecera() {
 
 function vInicio() {
   if (!estado.usuario) return '';
-  const { balance, total, lista, tareas, servicios } = estado.d;
-  const yo    = balance.find((b) => b.usuario_id === estado.usuario.id);
-  const otro  = balance.find((b) => b.usuario_id !== estado.usuario.id);
+  const { balance, balanceMes, total, lista, tareas, servicios } = estado.d;
+  // Esta tarjeta habla del mes, asi que el saldo tambien tiene que ser del mes.
+  // Con el historico decia "Renata te debe" en un mes en el que Tomas habia
+  // puesto menos del 60% que le toca: la cifra venia de agosto.
+  const yo    = (balanceMes || []).find((b) => b.usuario_id === estado.usuario.id);
+  // El nombre sale de usuarios y no del balance: un mes sin gastos no tiene
+  // filas en v_balance_mes y dejaria la frase sin destinatario.
+  const otro  = estado.usuarios.find((u) => u.id !== estado.usuario.id);
   const saldo = Number(yo?.saldo || 0);
+  const acum  = Number(balance.find((b) => b.usuario_id === estado.usuario.id)?.saldo || 0);
   const gastado = Number(total?.[0]?.total_pen || 0);
 
   const segs    = segmentosCategorias();
@@ -243,11 +249,18 @@ function vInicio() {
   const urgentes   = tareas.filter((t) => t.dias_restantes <= 0);
   const mias       = tareas.filter((t) => t.asignado_a === estado.usuario.id && t.dias_restantes <= 1);
 
+  const nombreOtro = escapar(otro?.nombre || '');
   const frase = Math.abs(saldo) < 0.01
-    ? 'Están a mano'
+    ? 'Están a mano este mes'
     : saldo > 0
-      ? `${escapar(otro?.nombre || '')} te debe`
-      : `Le debes a ${escapar(otro?.nombre || '')}`;
+      ? `${nombreOtro} te debe este mes`
+      : `Le debes a ${nombreOtro} este mes`;
+
+  // El acumulado solo aparece cuando dice algo distinto del mes: si arrastran
+  // saldo de meses anteriores, verlo solo del mes enganaria igual que antes.
+  const fraseAcum = acum > 0 ? `${nombreOtro} te debe en total`
+    : `Le debes a ${nombreOtro} en total`;
+  const mostrarAcum = Math.abs(acum - saldo) >= 0.01;
 
   const sinSubir = (estado.d.gastos || [])
     .filter((g) => g.drive_estado === 'error' || g.drive_estado === 'pendiente').length;
@@ -296,6 +309,11 @@ function vInicio() {
           ${soles(Math.abs(saldo))}
         </div>
       </div>
+      ${mostrarAcum ? `
+        <div class="fila">
+          <div class="fila-txt"><div class="fila-sub">${fraseAcum}</div></div>
+          <div class="fila-val tenue">${soles(Math.abs(acum))}</div>
+        </div>` : ''}
     </div>
 
     <div class="tarjeta">
@@ -945,12 +963,12 @@ const grupoValor = (form, grupo) =>
 
 async function cargar() {
   const p = estado.periodo;
-  const [gastos, balance, total, resumen, lista, tareas, servicios] = await Promise.all([
-    api.traerGastos(p), api.traerBalance(), api.traerTotalMes(p),
+  const [gastos, balance, balanceMes, total, resumen, lista, tareas, servicios] = await Promise.all([
+    api.traerGastos(p), api.traerBalance(), api.traerBalanceMes(p), api.traerTotalMes(p),
     api.traerResumenMes(p), api.traerLista(), api.traerTareas(),
     api.traerServicios(p),
   ].map((x) => x.catch(() => [])));
-  estado.d = { gastos, balance, total, resumen, lista, tareas, servicios };
+  estado.d = { gastos, balance, balanceMes, total, resumen, lista, tareas, servicios };
 }
 
 function pintar() {

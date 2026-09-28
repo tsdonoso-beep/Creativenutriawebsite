@@ -179,6 +179,9 @@ button { cursor: pointer; }
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+/* Cifra de contexto (el acumulado bajo el saldo del mes): se lee si la buscas,
+   pero no compite con el numero que manda. */
+.fila-val.tenue { font-size: 13.5px; font-weight: 550; color: var(--ink-3); }
 
 .monto-grande {
   font-size: 38px; font-weight: 800;

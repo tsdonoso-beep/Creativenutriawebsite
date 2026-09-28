@@ -105,7 +105,12 @@ export const traerCategorias = () =>
 export const traerGastos = (periodo, limite = 60) =>
   rest(`v_gastos_detalle?periodo=eq.${periodo}&order=fecha_gasto.desc,fecha_registro.desc&limit=${limite}`);
 
+/** Saldo acumulado desde el primer gasto. */
 export const traerBalance = () => rest('v_balance?order=nombre');
+
+/** Saldo de un mes suelto, sin arrastrar lo de meses anteriores. */
+export const traerBalanceMes = (periodo) =>
+  rest(`v_balance_mes?periodo=eq.${periodo}&order=nombre`);
 
 export const traerResumenMes = (periodo) =>
   rest(`v_resumen_mensual?periodo=eq.${periodo}&order=total_pen.desc`);
