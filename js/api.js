@@ -178,6 +178,10 @@ export const traerPrecios = (busqueda) =>
 
 export const reintentarDrive = () => fn('drive-reintentos', {});
 
+/** Registra que `de` le pasó plata a `a`. No es un gasto: mueve el saldo de los dos. */
+export const saldarDeuda = (p_de, p_a, p_monto, p_fecha, p_client_uuid) =>
+  rpc('saldar_deuda', { p_de, p_a, p_monto, p_fecha, p_client_uuid });
+
 export const pagarServicio = (p_pago_id, p_usuario_id, p_monto, p_fecha, p_pagado_por) =>
   rpc('pagar_servicio', { p_pago_id, p_usuario_id, p_monto, p_fecha, p_pagado_por });
 

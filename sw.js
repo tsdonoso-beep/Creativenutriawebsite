@@ -10,7 +10,7 @@
 // Las llamadas a Supabase nunca se cachean: datos viejos servidos como frescos
 // serían peor que un error honesto. De esos se encarga la cola.
 
-const CACHE = 'nutria-v3';
+const CACHE = 'nutria-v4';
 const ARMAZON = [
   './', './index.html', './app.css', './manifest.json',
   './js/app.js', './js/api.js', './js/cola.js', './js/config.js', './js/iconos.js',

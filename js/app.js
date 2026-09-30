@@ -314,6 +314,10 @@ function vInicio() {
           <div class="fila-txt"><div class="fila-sub">${fraseAcum}</div></div>
           <div class="fila-val tenue">${soles(Math.abs(acum))}</div>
         </div>` : ''}
+      ${Math.abs(saldo) >= 0.01 && otro ? `
+        <button class="btn suave" type="button" data-accion="saldar" style="margin-top:6px">
+          ${saldo < 0 ? `Ya le pagué a ${nombreOtro}` : `${nombreOtro} ya me pagó`}
+        </button>` : ''}
     </div>
 
     <div class="tarjeta">
@@ -956,6 +960,44 @@ function hojaPagar(pagoId) {
     </form>`);
 }
 
+/**
+ * Saldar la deuda del mes. El sentido lo da el signo del saldo: si debo, yo le
+ * paso a la otra persona; si me deben, ella me pasa a mí. El monto se puede
+ * bajar para un pago parcial.
+ */
+function hojaSaldar() {
+  const yo   = (estado.d.balanceMes || []).find((b) => b.usuario_id === estado.usuario.id);
+  const otro = estado.usuarios.find((u) => u.id !== estado.usuario.id);
+  const saldo = Number(yo?.saldo || 0);
+  if (!otro || Math.abs(saldo) < 0.01) return;
+
+  const debo = saldo < 0;
+  const monto = Math.abs(saldo).toFixed(2);
+  const de = debo ? estado.usuario : otro;
+  const a  = debo ? otro : estado.usuario;
+
+  abrirHoja(`
+    <h2 id="hoja-titulo">Saldar cuentas</h2>
+    <p class="fila-sub" style="white-space:normal;margin:0 0 14px">
+      ${escapar(de.nombre)} le pasó plata a ${escapar(a.nombre)}. No cuenta como gasto:
+      solo pone el saldo de los dos en cero.
+    </p>
+    <form data-form="saldar" data-de="${de.id}" data-a="${a.id}" data-cliente="${uuid()}">
+      <div class="campo">
+        <label>Monto</label>
+        <input class="entrada" name="monto" type="number" step="0.01" inputmode="decimal"
+               required min="0.01" max="${monto}" value="${monto}"
+               style="font-size:26px;font-weight:750">
+      </div>
+      <div class="campo">
+        <label>Fecha</label>
+        <input class="entrada" name="fecha" type="date" value="${hoy()}">
+      </div>
+      <button class="btn acento" type="submit">Registrar pago</button>
+      <button class="btn fantasma" type="button" data-accion="cerrar-hoja">Cancelar</button>
+    </form>`);
+}
+
 const grupoValor = (form, grupo) =>
   form.querySelector(`[data-grupo="${grupo}"] [aria-pressed="true"]`)?.dataset.valor || null;
 
@@ -1081,6 +1123,8 @@ document.addEventListener('click', async (ev) => {
     const s = (estado.d.servicios || []).find((x) => x.pago_id === id);
     if (s) hojaServicio(s);
   }
+
+  if (accion === 'saldar') hojaSaldar();
 
   if (accion === 'registrar-compra') {
     const comprados = estado.d.lista.filter((i) => i.comprado);
@@ -1273,6 +1317,24 @@ document.addEventListener('submit', async (ev) => {
       }
       cerrarHoja(); brindis('Servicio guardado'); await refrescar();
     } catch (e) { brindis('No se pudo guardar'); btn.disabled = false; }
+    return;
+  }
+
+  if (form.dataset.form === 'saldar') {
+    const btn = form.querySelector('[type="submit"]');
+    btn.disabled = true; btn.textContent = 'Guardando…';
+    try {
+      // El uuid nace al abrir la hoja, no al enviar: si el envio se repite por
+      // mala señal, el servidor reconoce la misma liquidacion y no la duplica.
+      await api.saldarDeuda(
+        form.dataset.de, form.dataset.a, +form.monto.value,
+        form.fecha.value || hoy(), form.dataset.cliente,
+      );
+      cerrarHoja(); brindis('Pago registrado'); await refrescar();
+    } catch (e) {
+      brindis('No se pudo registrar el pago');
+      btn.disabled = false; btn.textContent = 'Registrar pago';
+    }
     return;
   }
 
