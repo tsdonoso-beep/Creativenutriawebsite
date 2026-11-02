@@ -1049,7 +1049,11 @@ function hojaSaldar() {
       </div>
       <div class="campo">
         <label>Fecha</label>
-        <input class="entrada" name="fecha" type="date" value="${hoy()}">
+        <input class="entrada" name="fecha" type="date" value="${fechaPorDefecto()}">
+        ${estado.periodo < periodoDe(hoy())
+          ? `<div class="fila-sub" style="white-space:normal;margin-top:6px">
+               Un pago cuenta en el mes de su fecha: así salda ${escapar(MESES[+estado.periodo.slice(5) - 1])}
+               y no deja un saldo a favor en el mes actual.</div>` : ''}
       </div>
       <button class="btn acento" type="submit">Registrar pago</button>
       <button class="btn fantasma" type="button" data-accion="cerrar-hoja">Cancelar</button>
@@ -1402,7 +1406,7 @@ document.addEventListener('submit', async (ev) => {
       // mala señal, el servidor reconoce la misma liquidacion y no la duplica.
       await api.saldarDeuda(
         form.dataset.de, form.dataset.a, +form.monto.value,
-        form.fecha.value || hoy(), form.dataset.cliente,
+        form.fecha.value || fechaPorDefecto(), form.dataset.cliente,
       );
       cerrarHoja(); brindis('Pago registrado'); await refrescar();
     } catch (e) {
