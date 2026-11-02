@@ -170,7 +170,7 @@ export const generarPagos = (p_periodo) => rpc('generar_pagos_mes', { p_periodo 
 
 /** El desglose de una boleta: que se compro y a cuanto. */
 export const traerItems = (gasto_id) =>
-  rest(`gasto_items?gasto_id=eq.${gasto_id}&order=orden&select=nombre,cantidad,precio`);
+  rest(`gasto_items?gasto_id=eq.${gasto_id}&order=orden&select=nombre,cantidad,unidad,precio,descuento,detalle`);
 
 /** Historial de precios de un producto, para saber si subio. */
 export const traerPrecios = (busqueda) =>

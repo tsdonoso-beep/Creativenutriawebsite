@@ -239,3 +239,66 @@ export async function syncSheet(token: string, supa: any, parentFolder: string):
   }
   return sid;
 }
+
+// ---------------------------------------------------------------------------
+// Detalle de productos: una fila por producto de cada boleta, en su propia
+// hoja. Va aparte de la de gastos porque ahi cada fila es un gasto con su
+// monto; meter los productos repetiria el monto en cada uno y rompe las sumas.
+// ---------------------------------------------------------------------------
+
+export function buildCsvDetalle(filas: any[]): string {
+  const head = [
+    'Fecha', 'Periodo', 'Comercio', 'Categoría', 'Producto', 'Cantidad', 'Unidad',
+    'Precio pagado', 'Descuento', 'Precio de lista', 'A qué se refiere', 'Pagó', 'Boleta',
+  ];
+  const lines = [head.map(csvCell).join(',')];
+  for (const f of filas) {
+    const pagado = f.precio == null ? null : Number(f.precio);
+    const desc = Number(f.descuento || 0);
+    lines.push([
+      f.fecha_gasto || '',
+      f.periodo || '',
+      f.comercio || '',
+      f.categoria || '',
+      f.nombre || '',
+      f.cantidad == null ? '' : f.cantidad,
+      f.unidad || '',
+      pagado == null ? '' : pagado.toFixed(2),
+      desc ? desc.toFixed(2) : '',
+      pagado == null ? '' : (pagado + desc).toFixed(2),
+      f.detalle || '',
+      f.pagado_por_nombre || '',
+      f.drive_url || '',
+    ].map(csvCell).join(','));
+  }
+  return '﻿' + lines.join('\n');
+}
+
+/** Vuelca el desglose de todas las boletas a su hoja, creándola la primera vez. */
+export async function syncSheetDetalle(token: string, supa: any, parentFolder: string): Promise<string> {
+  const [iRes, gRes, cRes] = await Promise.all([
+    supa.from('gasto_items')
+      .select('gasto_id, nombre, cantidad, unidad, precio, descuento, detalle, orden'),
+    supa.from('v_gastos_detalle')
+      .select('id, fecha_gasto, periodo, comercio, categoria, pagado_por_nombre, drive_url'),
+    supa.from('configuracion').select('sheet_detalle_id').eq('id', 1).single(),
+  ]);
+  const gastos = new Map((gRes.data || []).map((g: any) => [g.id, g]));
+  const filas = (iRes.data || [])
+    .map((i: any) => ({ ...i, ...(gastos.get(i.gasto_id) || {}) }))
+    // Lo más reciente arriba; dentro de una boleta, en el orden del ticket
+    .sort((a: any, b: any) =>
+      String(b.fecha_gasto || '').localeCompare(String(a.fecha_gasto || '')) ||
+      String(a.gasto_id).localeCompare(String(b.gasto_id)) ||
+      (a.orden ?? 0) - (b.orden ?? 0));
+
+  const csv = buildCsvDetalle(filas);
+  let sid = cRes.data?.sheet_detalle_id as string | null;
+  if (!sid) {
+    sid = await createSheet(token, 'Detalle de productos - LA NUTRIA APP', parentFolder, csv);
+    await supa.from('configuracion').update({ sheet_detalle_id: sid }).eq('id', 1);
+  } else {
+    await updateSheet(token, sid, csv);
+  }
+  return sid;
+}

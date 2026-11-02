@@ -1,6 +1,6 @@
-// sheet-sync · vuelca todos los gastos al Google Sheet.
+// sheet-sync · vuelca los gastos y el detalle de productos a sus Google Sheets.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { ensureRoot, getAccessToken, syncSheet } from './google.ts';
+import { ensureRoot, getAccessToken, syncSheet, syncSheetDetalle } from './google.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -44,10 +44,13 @@ Deno.serve(async (req) => {
     const token = await getAccessToken(supa);
     const raiz = await ensureRoot(token, supa);
     const sheetId = await syncSheet(token, supa, raiz);
+    const detalleId = await syncSheetDetalle(token, supa, raiz);
     return json({
       ok: true,
       sheet_id: sheetId,
       url: `https://docs.google.com/spreadsheets/d/${sheetId}/edit`,
+      detalle_id: detalleId,
+      detalle_url: `https://docs.google.com/spreadsheets/d/${detalleId}/edit`,
     });
   } catch (e) {
     return json({ error: String((e as any)?.message || e) }, 500);

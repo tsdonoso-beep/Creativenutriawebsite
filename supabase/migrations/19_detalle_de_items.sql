@@ -29,3 +29,10 @@ join gastos g on g.id = i.gasto_id;
 
 revoke all on v_gasto_items from anon;
 grant select on v_gasto_items to authenticated;
+
+-- El detalle de productos vive en su propia hoja de calculo, no en la de
+-- gastos: el CSV->Sheet de Drive solo crea una pestaña, y meter productos en
+-- la hoja de gastos repetiria el monto de cada gasto en cada producto y
+-- rompe cualquier suma de esa columna.
+alter table configuracion
+  add column if not exists sheet_detalle_id text;

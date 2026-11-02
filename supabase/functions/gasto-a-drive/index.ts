@@ -1,6 +1,6 @@
 // gasto-a-drive · sube la boleta de un gasto a Drive y refresca el Sheet.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { ensureFolder, ensureRoot, esFalloDeConexion, getAccessToken, sani, syncSheet, uploadFile } from './google.ts';
+import { ensureFolder, ensureRoot, esFalloDeConexion, getAccessToken, sani, syncSheet, syncSheetDetalle, uploadFile } from './google.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -84,11 +84,14 @@ Deno.serve(async (req) => {
       drive_error: null,
     }).eq('id', g.id);
 
-    // El Sheet es best-effort: que falle no invalida la subida de la boleta.
-    try {
-      await syncSheet(token, supa, raiz);
-    } catch (e) {
-      console.error('sheet sync:', String(e));
+    // Las hojas son best-effort: que fallen no invalida la subida de la boleta,
+    // y que falle una no debe impedir que se actualice la otra.
+    for (const [hoja, sync] of [['gastos', syncSheet], ['detalle', syncSheetDetalle]] as const) {
+      try {
+        await sync(token, supa, raiz);
+      } catch (e) {
+        console.error(`sheet ${hoja}:`, String(e));
+      }
     }
 
     return json({ ok: true, drive_url: up.url, archivo: nombre, carpeta: g.periodo });

@@ -813,7 +813,11 @@ async function hojaDetalleGasto(gastoId) {
           <div class="fila">
             <div class="fila-txt">
               <div class="fila-tit">${escapar(i.nombre)}</div>
-              ${i.cantidad ? `<div class="fila-sub">${escapar(i.cantidad)}</div>` : ''}
+              ${i.cantidad || Number(i.descuento) > 0 ? `<div class="fila-sub">${
+                [i.cantidad ? `${Number(i.cantidad)}${i.unidad ? ' ' + escapar(i.unidad) : ''}` : '',
+                 Number(i.descuento) > 0 ? `descuento ${solesTxt(i.descuento)}` : '']
+                  .filter(Boolean).join(' · ')}</div>` : ''}
+              ${i.detalle ? `<div class="fila-sub" style="white-space:normal;font-size:12px;margin-top:2px">${escapar(i.detalle)}</div>` : ''}
             </div>
             <div class="fila-val">${i.precio != null ? solesTxt(i.precio) : '—'}</div>
           </div>`).join('')}
