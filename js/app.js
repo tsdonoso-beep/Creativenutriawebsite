@@ -6,8 +6,20 @@ import { REINTENTO_MS, PALETA, PALETA_OSCURA, GRIS_OTROS, MAX_SEGMENTOS } from '
 // ---------------------------------------------------------------- utilidades
 
 const $ = (s) => document.querySelector(s);
-const hoy = () => new Date().toISOString().slice(0, 10);
+// La fecha local, no la UTC: con toISOString() la app pasaba al mes siguiente a
+// las 7 pm del ultimo dia (Lima va 5 horas detras de UTC) y un gasto del
+// atardecer del 31 quedaba fechado el 1.
+const fechaLocal = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const hoy = () => fechaLocal(new Date());
 const periodoDe = (f) => f.slice(0, 7);
+
+/** Mueve un periodo "2026-10" n meses (negativo = atras). */
+function sumarMes(periodo, n) {
+  const [a, m] = periodo.split('-').map(Number);
+  const t = a * 12 + (m - 1) + n;
+  return `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, '0')}`;
+}
 
 const nf = new Intl.NumberFormat('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const plata = (n) => nf.format(Number(n || 0));
@@ -30,8 +42,23 @@ function fechaCorta(f) {
   const d = new Date(f + 'T12:00:00');
   const ayer = new Date(); ayer.setDate(ayer.getDate() - 1);
   if (f === hoy()) return 'Hoy';
-  if (f === ayer.toISOString().slice(0, 10)) return 'Ayer';
+  if (f === fechaLocal(ayer)) return 'Ayer';
   return `${d.getDate()} ${MESES[d.getMonth()].slice(0, 3)}`;
+}
+
+/** "este mes" si se mira el actual; "en septiembre" si es uno anterior. */
+const etiquetaMes = () => estado.periodo === periodoDe(hoy())
+  ? 'este mes' : `en ${MESES[+estado.periodo.slice(5) - 1]}`;
+
+/**
+ * Fecha con la que arranca un gasto nuevo. Si se esta mirando un mes pasado
+ * (porque se olvido registrar algo), hoy lo mandaria al mes actual y el gasto
+ * desapareceria de la pantalla: se propone el ultimo dia del mes que se mira.
+ */
+function fechaPorDefecto() {
+  if (estado.periodo >= periodoDe(hoy())) return hoy();
+  const [a, m] = estado.periodo.split('-').map(Number);
+  return fechaLocal(new Date(a, m, 0));
 }
 
 function cuandoTarea(dias) {
@@ -107,6 +134,7 @@ const estado = {
   usuarios: [],
   categorias: [],
   periodo: periodoDe(hoy()),
+  periodoInicio: null,   // primer mes navegable; null hasta que se lea
   vista: 'inicio',
   tipos: [],
   d: { gastos: [], balance: [], balanceMes: [], total: [], resumen: [], lista: [], tareas: [], servicios: [] },
@@ -220,6 +248,32 @@ function cabecera() {
       </div>
       <button data-accion="cambiar-usuario" aria-label="Cambiar de persona"
               style="margin-top:6px">${avatar(estado.usuario, true)}</button>
+    </div>
+    ${['inicio', 'gastos', 'servicios'].includes(estado.vista) ? selectorMes() : ''}`;
+}
+
+/**
+ * Navegacion entre meses. Solo se puede ir desde el primer mes del historial
+ * hasta el actual: no hay nada que ver en el futuro, y agosto fue de prueba.
+ * Tocar el nombre del mes vuelve al actual.
+ */
+function selectorMes() {
+  const actual = periodoDe(hoy());
+  const min = estado.periodoInicio && estado.periodoInicio < actual ? estado.periodoInicio : actual;
+  const hayAntes = estado.periodo > min;
+  const hayDespues = estado.periodo < actual;
+  const esActual = estado.periodo === actual;
+  return `
+    <div class="selector-mes" role="group" aria-label="Mes que se está viendo">
+      <button data-accion="mes" data-delta="-1" aria-label="Mes anterior"
+              ${hayAntes ? '' : 'disabled'}>${iconos.izq}</button>
+      <button data-accion="mes" data-delta="hoy" class="mes-nombre"
+              aria-label="${esActual ? 'Mes actual' : 'Volver al mes actual'}"
+              ${esActual ? 'disabled' : ''}>
+        ${escapar(mesLargo(estado.periodo))}${esActual ? '' : '<small>volver a hoy</small>'}
+      </button>
+      <button data-accion="mes" data-delta="1" aria-label="Mes siguiente"
+              ${hayDespues ? '' : 'disabled'}>${iconos.der}</button>
     </div>`;
 }
 
@@ -251,10 +305,10 @@ function vInicio() {
 
   const nombreOtro = escapar(otro?.nombre || '');
   const frase = Math.abs(saldo) < 0.01
-    ? 'Están a mano este mes'
+    ? `Están a mano ${etiquetaMes()}`
     : saldo > 0
-      ? `${nombreOtro} te debe este mes`
-      : `Le debes a ${nombreOtro} este mes`;
+      ? `${nombreOtro} te debe ${etiquetaMes()}`
+      : `Le debes a ${nombreOtro} ${etiquetaMes()}`;
 
   // El acumulado solo aparece cuando dice algo distinto del mes: si arrastran
   // saldo de meses anteriores, verlo solo del mes enganaria igual que antes.
@@ -280,7 +334,7 @@ function vInicio() {
       <div class="monto-grande">${soles(gastado)}</div>
       ${segs.length
         ? barraDist(segs, 'Distribución del gasto por categoría')
-        : '<div class="fila-sub" style="margin-top:10px">Todavía no hay gastos este mes</div>'}
+        : `<div class="fila-sub" style="margin-top:10px">Todavía no hay gastos ${etiquetaMes()}</div>`}
     </div>
 
     <div class="tarjeta">
@@ -293,7 +347,7 @@ function vInicio() {
             aportes.filter((a) => a.puesto > 0).map((a) => ({
               nombre: a.nombre, valor: a.puesto, color: a.color,
             })),
-            'Aporte de cada uno este mes')
+            `Aporte de cada uno ${etiquetaMes()}`)
         : ''}
       <div class="aporte">
         ${aportes.map((a) => `
@@ -330,7 +384,7 @@ function vInicio() {
       </div>
       ${porVencer.length
         ? porVencer.map(filaServicio).join('')
-        : '<div class="fila-sub">Nada pendiente este mes</div>'}
+        : `<div class="fila-sub">Nada pendiente ${etiquetaMes()}</div>`}
     </div>
 
     <div class="tarjeta">
@@ -435,7 +489,7 @@ function vServicios() {
       <div class="saludo" style="letter-spacing:.08em">FALTA PAGAR EN ${mesLargo(estado.periodo).toUpperCase()}</div>
       <div class="monto-grande">${soles(porPagar)}</div>
       ${yaPagado ? `<div class="fila-sub" style="margin-top:4px">
-        Ya pagaron ${solesTxt(yaPagado)} este mes</div>` : ''}
+        Ya pagaron ${solesTxt(yaPagado)} ${etiquetaMes()}</div>` : ''}
     </div>
 
     ${pendientes.length ? `
@@ -459,7 +513,7 @@ function vGastos() {
   if (!gastos.length) return `
     <div class="tarjeta">${resumenCabecera(gastado)}</div>
     <div class="vacio">${nutriaDormida(72)}
-      <strong>Todavía nada este mes</strong>
+      <strong>Todavía nada ${etiquetaMes()}</strong>
       <p>Toca el botón naranja para registrar el primer gasto.</p></div>`;
 
   const porDia = {};
@@ -691,7 +745,7 @@ function hojaGasto(prefill = {}) {
         </div>
         <div class="campo">
           <label>Fecha</label>
-          <input class="entrada" name="fecha_gasto" type="date" value="${prefill.fecha || hoy()}">
+          <input class="entrada" name="fecha_gasto" type="date" value="${prefill.fecha || fechaPorDefecto()}">
         </div>
       </div>
 
@@ -1014,7 +1068,11 @@ async function cargar() {
     api.traerResumenMes(p), api.traerLista(), api.traerTareas(),
     api.traerServicios(p),
   ].map((x) => x.catch(() => [])));
+  // Si se cambio de mes mientras esto cargaba, la respuesta es de otro mes: pisar
+  // el estado con ella mostraria numeros de un mes bajo el titulo de otro.
+  if (p !== estado.periodo) return false;
   estado.d = { gastos, balance, balanceMes, total, resumen, lista, tareas, servicios };
+  return true;
 }
 
 function pintar() {
@@ -1031,8 +1089,7 @@ function pintar() {
 }
 
 async function refrescar() {
-  await cargar();
-  pintar();
+  if (await cargar()) pintar();
 }
 
 // ---------------------------------------------------------------------- cola
@@ -1071,6 +1128,19 @@ document.addEventListener('click', async (ev) => {
   const { accion, id, vista } = b.dataset;
 
   if (accion === 'ir') { vibrar(); estado.vista = vista; pintar(); }
+
+  if (accion === 'mes') {
+    const actual = periodoDe(hoy());
+    const min = estado.periodoInicio && estado.periodoInicio < actual ? estado.periodoInicio : actual;
+    const pedido = b.dataset.delta === 'hoy' ? actual : sumarMes(estado.periodo, +b.dataset.delta);
+    const nuevo = pedido > actual ? actual : pedido < min ? min : pedido;
+    if (nuevo === estado.periodo) return;
+    vibrar();
+    estado.periodo = nuevo;
+    // El titulo cambia al instante; los numeros, cuando llegan
+    $('#cabecera').innerHTML = cabecera();
+    await refrescar();
+  }
 
   if (accion === 'cerrar-hoja') cerrarHoja();
 
@@ -1379,7 +1449,7 @@ document.addEventListener('submit', async (ev) => {
       monto: +form.monto.value,
       comercio: form.comercio.value.trim() || null,
       descripcion: form.descripcion.value.trim() || null,
-      fecha_gasto: form.fecha_gasto.value || hoy(),
+      fecha_gasto: form.fecha_gasto.value || fechaPorDefecto(),
       reparto_tipo: grupoValor(form, 'reparto_tipo'),
       foto: estado.fotoPendiente || undefined,
       // La lectura de Gemini viaja entera: adentro van los productos con su
@@ -1441,6 +1511,8 @@ async function arrancar() {
   estado.usuario = estado.usuarios.find((u) => u.id === guardado) || null;
 
   estado.enCola = await cola.contar();
+  api.periodoInicio().then((p) => { if (typeof p === 'string') { estado.periodoInicio = p; pintar(); } })
+    .catch(() => {});
   await refrescar();
   if (!estado.usuario) hojaUsuario();
   vaciarCola(false);

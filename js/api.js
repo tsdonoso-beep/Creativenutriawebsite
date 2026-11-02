@@ -105,6 +105,13 @@ export const traerCategorias = () =>
 export const traerGastos = (periodo, limite = 60) =>
   rest(`v_gastos_detalle?periodo=eq.${periodo}&order=fecha_gasto.desc,fecha_registro.desc&limit=${limite}`);
 
+/**
+ * Primer mes que cuenta en el historial. Agosto 2026 fue de prueba: la app no
+ * deja navegar antes de este. configuracion no se puede leer directo (RLS sin
+ * politicas), por eso va por una funcion.
+ */
+export const periodoInicio = () => rpc('fn_periodo_inicio', {});
+
 /** Saldo acumulado desde el primer gasto. */
 export const traerBalance = () => rest('v_balance?order=nombre');
 

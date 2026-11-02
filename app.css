@@ -120,6 +120,31 @@ button { cursor: pointer; }
 }
 .titulo-grande .suave { color: var(--ink-3); }
 
+/* ---------- Selector de mes ---------- */
+
+.selector-mes { display: flex; align-items: center; gap: 8px; margin: 16px 0 2px; }
+.selector-mes button {
+  height: 42px; min-width: 42px; border-radius: 14px;
+  display: grid; place-items: center;
+  background: var(--card); color: var(--ink);
+  border: 1px solid var(--linea);
+  transition: opacity .15s, transform .12s;
+}
+.selector-mes button:active:not(:disabled) { transform: scale(.96); }
+.selector-mes button:disabled { opacity: .3; }
+.selector-mes .mes-nombre {
+  flex: 1; padding: 0 14px;
+  font-size: 15.5px; font-weight: 650; text-transform: capitalize;
+  line-height: 1.15;
+}
+/* En el mes actual el nombre va deshabilitado (no hay a donde volver), pero
+   tiene que leerse con normalidad: lo apagado son solo las flechas. */
+.selector-mes .mes-nombre:disabled { opacity: 1; }
+.mes-nombre small {
+  display: block; text-transform: none;
+  font-size: 11.5px; font-weight: 600; color: var(--acento);
+}
+
 /* ---------- Tarjetas ---------- */
 
 .tarjeta {
